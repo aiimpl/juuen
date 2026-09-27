@@ -64,7 +64,7 @@ cy = int(N / 2 - RECT_CY * px_per_mm)
 y0, x0 = cy - rh // 2, cx - rw // 2
 relief[y0:y0 + rh, x0:x0 + rw] = np.clip(hr, 0, 1)
 # 縁をなだらかに（打刻の斜面）
-relief = gaussian_filter(relief, 1.1)
+relief = gaussian_filter(relief, 1.5)             # 画素より細い線はカメラが動くとちらつくので、少しだけなめらかに
 relief *= RELIEF_H
 # 地面の線：建物の足元に、横に長い台（池のほとりの基壇）
 base_y = None

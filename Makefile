@@ -28,6 +28,7 @@ juuen-audio:
 
 test:
 	$(BLENDER) -b build/coin.blend -P tools/test_frames.py -- 1,75,130,168 50
+	$(BLENDER) -b build/byodoin.blend -P tools/building_shot.py -- relief 1 1
 	$(BLENDER) -b build/byodoin.blend -P tools/shot.py -- 480 build/test/building_end.png 170 0 9 0 0 8.4 40 50
 
 render:

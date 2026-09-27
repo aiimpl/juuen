@@ -25,7 +25,7 @@ scn.frame_start, scn.frame_end = 1, F_END
 
 MM = 0.001
 # 光の強さ（本物の写真と並べて、地・浮き彫り・縁の色が合うように決めた）
-KEY_E, SOFT_E, WORLD, EXPOSURE = 0.06, 0.0, 0.16, 1.5
+KEY_E, SOFT_E, WORLD, EXPOSURE = 0.06, 0.0, 0.16, 1.9
 
 
 def node_mat(name):
@@ -58,82 +58,35 @@ def bronze():
     b = N(nt, 'ShaderNodeBsdfPrincipled', inputs={'Metallic': 1.0, 'Roughness': 0.34})
     tc = N(nt, 'ShaderNodeTexCoord')
     h = N(nt, 'ShaderNodeAttribute', attribute_type='GEOMETRY', attribute_name='h')      # 表面の高さ（mm）
-    ao = N(nt, 'ShaderNodeAmbientOcclusion', inputs={'Distance': 0.00022})
-    ao.samples = 12
     # 高い所（縁・浮き彫り・文字の上）は触られて明るく、くぼみは酸化して暗い
     hi = N(nt, 'ShaderNodeMapRange', inputs={1: 0.05, 2: 0.2, 3: 0.0, 4: 1.0})
     L(nt, h.outputs['Fac'], hi.inputs[0])
     col_mid = N(nt, 'ShaderNodeValToRGB')
-    col_mid.color_ramp.elements[0].color = (0.30, 0.085, 0.028, 1)
-    col_mid.color_ramp.elements[1].color = (0.68, 0.23, 0.075, 1)
-    blot = N(nt, 'ShaderNodeTexNoise', inputs={'Scale': 180.0, 'Detail': 6.0, 'Roughness': 0.6})
+    col_mid.color_ramp.elements[0].color = (0.32, 0.13, 0.05, 1)
+    col_mid.color_ramp.elements[1].color = (0.70, 0.33, 0.15, 1)
+    blot = N(nt, 'ShaderNodeTexNoise', inputs={'Scale': 180.0, 'Detail': 3.0, 'Roughness': 0.5})
     L(nt, tc.outputs['Object'], blot.inputs['Vector'])
     L(nt, blot.outputs['Fac'], col_mid.inputs[0])
     polish = N(nt, 'ShaderNodeMix', data_type='RGBA')
     L(nt, hi.outputs[0], polish.inputs['Factor'])
     L(nt, col_mid.outputs[0], polish.inputs[6])
-    polish.inputs[7].default_value = (0.92, 0.42, 0.17, 1)
-    aor = N(nt, 'ShaderNodeMapRange', inputs={1: 0.45, 2: 0.95, 3: 0.12, 4: 1.0})
-    L(nt, ao.outputs['AO'], aor.inputs[0])
-    patina = N(nt, 'ShaderNodeMix', data_type='RGBA', inputs={'Factor': 1.0})
-    patina.blend_type = 'MULTIPLY'
-    L(nt, polish.outputs[2], patina.inputs[6])
-    L(nt, aor.outputs[0], patina.inputs[7])
+    polish.inputs[7].default_value = (0.92, 0.50, 0.22, 1)
     cav = N(nt, 'ShaderNodeAttribute', attribute_type='GEOMETRY', attribute_name='cav')
     dirt = N(nt, 'ShaderNodeMix', data_type='RGBA')
     L(nt, cav.outputs['Fac'], dirt.inputs['Factor'])
-    L(nt, patina.outputs[2], dirt.inputs[6])
+    L(nt, polish.outputs[2], dirt.inputs[6])     # くぼみの黒ずみは画面の AO でなく高さから（AO は画面上の計算で、カメラが動くとちらつく）
     dirt.inputs[7].default_value = (0.09, 0.028, 0.012, 1)     # 酸化して黒ずんだ銅
     L(nt, dirt.outputs[2], b.inputs['Base Color'])
-    # 粗さ：細かいすり傷（向きの違う細長いノイズを 2 枚）と、指紋のくもり
-    def scratches(rotz, scale):
-        # 先に回してから引き伸ばす（Mapping は拡大→回転の順なので 2 段に分ける）
-        rt = N(nt, 'ShaderNodeMapping', inputs={'Rotation': (0, 0, rotz)})
-        L(nt, tc.outputs['Object'], rt.inputs['Vector'])
-        mp = N(nt, 'ShaderNodeMapping', inputs={'Scale': (scale, scale * 30, scale)})
-        L(nt, rt.outputs[0], mp.inputs['Vector'])
-        nz = N(nt, 'ShaderNodeTexNoise', inputs={'Scale': 1.0, 'Detail': 2.0})
-        L(nt, mp.outputs[0], nz.inputs['Vector'])
-        mr = N(nt, 'ShaderNodeMapRange', inputs={1: 0.69, 2: 0.73, 3: 0.0, 4: 1.0})
-        L(nt, nz.outputs['Fac'], mr.inputs[0])
-        return mr.outputs[0]
-    # 細かすぎると画素と干渉して縞（モアレ）になるので、線の幅は 20μm 前後にする
-    s1, s2, s3 = scratches(0.6, 520), scratches(-1.1, 380), scratches(2.2, 450)
-    smax0 = N(nt, 'ShaderNodeMath', operation='MAXIMUM')
-    L(nt, s1, smax0.inputs[0])
-    L(nt, s2, smax0.inputs[1])
-    smax = N(nt, 'ShaderNodeMath', operation='MAXIMUM')
-    L(nt, smax0.outputs[0], smax.inputs[0])
-    L(nt, s3, smax.inputs[1])
-    finger = N(nt, 'ShaderNodeTexNoise', inputs={'Scale': 90.0, 'Detail': 3.0})
+    # 粗さ：指紋のくもり。細いすり傷は画素と干渉してカメラが動くたびにちらつくので入れない
+    finger = N(nt, 'ShaderNodeTexNoise', inputs={'Scale': 90.0, 'Detail': 2.0})
     L(nt, tc.outputs['Object'], finger.inputs['Vector'])
     rough = N(nt, 'ShaderNodeMapRange', inputs={1: 0.3, 2: 0.7, 3: 0.34, 4: 0.52})
     L(nt, finger.outputs['Fac'], rough.inputs[0])
-    rh = N(nt, 'ShaderNodeMath', operation='MULTIPLY_ADD', inputs={1: 0.18})
-    L(nt, smax.outputs[0], rh.inputs[0])
-    L(nt, rough.outputs[0], rh.inputs[2])
     rpol = N(nt, 'ShaderNodeMix', data_type='FLOAT')
     L(nt, hi.outputs[0], rpol.inputs['Factor'])
-    L(nt, rh.outputs[0], rpol.inputs[2])
+    L(nt, rough.outputs[0], rpol.inputs[2])
     rpol.inputs[3].default_value = 0.27
     L(nt, rpol.outputs[0], b.inputs['Roughness'])
-    bump = N(nt, 'ShaderNodeBump', inputs={'Strength': 0.12, 'Distance': 0.00001})
-    L(nt, smax.outputs[0], bump.inputs['Height'])
-    L(nt, bump.outputs[0], b.inputs['Normal'])
-    # 円の外は透明（表面の格子は正方形なので）
-    ob_c = N(nt, 'ShaderNodeTexCoord')
-    ln = N(nt, 'ShaderNodeVectorMath', operation='LENGTH')
-    sep = N(nt, 'ShaderNodeSeparateXYZ')
-    L(nt, ob_c.outputs['Object'], sep.inputs[0])
-    comb = N(nt, 'ShaderNodeCombineXYZ')
-    L(nt, sep.outputs['X'], comb.inputs['X'])
-    L(nt, sep.outputs['Y'], comb.inputs['Y'])
-    L(nt, comb.outputs[0], ln.inputs[0])
-    inside = N(nt, 'ShaderNodeMath', operation='LESS_THAN', inputs={1: R_COIN * MM})
-    L(nt, ln.outputs['Value'], inside.inputs[0])
-    L(nt, inside.outputs[0], b.inputs['Alpha'])
-    m.surface_render_method = 'DITHERED'
-    m.use_transparent_shadow = True
     L(nt, b.outputs[0], out.inputs['Surface'])
     return m
 
@@ -152,10 +105,9 @@ Z = THICK + fh
 verts = np.stack([X.ravel() * MM, Y.ravel() * MM, Z.ravel() * MM], 1)
 idx = np.arange(n * n).reshape(n, n)
 quads = np.stack([idx[:-1, :-1].ravel(), idx[1:, :-1].ravel(), idx[1:, 1:].ravel(), idx[:-1, 1:].ravel()], 1)
-# 円の外の四角は落とす（少し余裕を残して、あとはシェーダーで切る）
-cx = (X[:-1, :-1] + X[1:, 1:]) / 2
-cy = (Y[:-1, :-1] + Y[1:, 1:]) / 2
-keep = (np.hypot(cx, cy) < R_COIN + 0.05).ravel()
+# 円の外にかかる四角は落とす（透明で切り抜くと縁がちらつくので、形そのものを円にする。すき間は側面の面取りが隠す）
+R2 = np.hypot(X, Y) < R_COIN - 0.01
+keep = (R2[:-1, :-1] & R2[1:, :-1] & R2[1:, 1:] & R2[:-1, 1:]).ravel()
 quads = quads[keep]
 me = bpy.data.meshes.new('十円玉_表')
 me.vertices.add(len(verts))
@@ -176,7 +128,8 @@ top = bpy.data.objects.new('十円玉_表', me)
 scn.collection.objects.link(top)
 
 # 側面（なめらかな縁。角はわずかに丸い）
-bpy.ops.mesh.primitive_cylinder_add(vertices=256, radius=R_COIN * MM, depth=THICK * MM, location=(0, 0, THICK * MM / 2))
+# 上のふたは面より 0.03mm 下げる（面の地と同じ高さだと、2 枚の面が重なって細かい縞がちらつく）
+bpy.ops.mesh.primitive_cylinder_add(vertices=256, radius=R_COIN * MM, depth=(THICK - 0.03) * MM, location=(0, 0, (THICK - 0.03) * MM / 2))
 side = bpy.context.active_object
 side.name = '十円玉_側面'
 bv = side.modifiers.new('面取り', 'BEVEL')
@@ -192,16 +145,16 @@ side.data.materials.append(m_side)
 m, nt, out = node_mat('くるみ材')
 b = N(nt, 'ShaderNodeBsdfPrincipled', inputs={'Roughness': 0.55, 'Coat Weight': 0.08, 'Coat Roughness': 0.35})
 tc = N(nt, 'ShaderNodeTexCoord')
-mp = N(nt, 'ShaderNodeMapping', inputs={'Scale': (60.0, 6.0, 60.0)})
+mp = N(nt, 'ShaderNodeMapping', inputs={'Scale': (140.0, 9.0, 140.0)})
 L(nt, tc.outputs['Object'], mp.inputs['Vector'])
-wave = N(nt, 'ShaderNodeTexWave', inputs={'Scale': 3.0, 'Distortion': 8.0, 'Detail': 6.0, 'Detail Scale': 1.5})
+wave = N(nt, 'ShaderNodeTexWave', inputs={'Scale': 4.0, 'Distortion': 14.0, 'Detail': 4.0, 'Detail Scale': 2.5})
 L(nt, mp.outputs[0], wave.inputs['Vector'])
 cr = N(nt, 'ShaderNodeValToRGB')
-cr.color_ramp.elements[0].color = (0.035, 0.018, 0.01, 1)
-cr.color_ramp.elements[1].color = (0.13, 0.07, 0.04, 1)
+cr.color_ramp.elements[0].color = (0.05, 0.026, 0.014, 1)
+cr.color_ramp.elements[1].color = (0.11, 0.058, 0.033, 1)
 L(nt, wave.outputs['Fac'], cr.inputs[0])
 L(nt, cr.outputs[0], b.inputs['Base Color'])
-bump = N(nt, 'ShaderNodeBump', inputs={'Strength': 0.15, 'Distance': 0.0002})
+bump = N(nt, 'ShaderNodeBump', inputs={'Strength': 0.03, 'Distance': 0.0001})
 L(nt, wave.outputs['Fac'], bump.inputs['Height'])
 L(nt, bump.outputs[0], b.inputs['Normal'])
 L(nt, b.outputs[0], out.inputs['Surface'])
@@ -333,7 +286,7 @@ r.image_settings.color_mode = 'RGB'
 r.filepath = os.path.join(ROOT, 'build', 'coin_frames', 'c_')
 r.use_overwrite = False
 ee = scn.eevee
-ee.taa_render_samples = 48
+ee.taa_render_samples = 96
 ee.use_raytracing = True
 ee.ray_tracing_options.resolution_scale = '1'
 ee.ray_tracing_options.trace_max_roughness = 0.5

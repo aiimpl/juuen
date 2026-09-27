@@ -2,8 +2,9 @@
 
 0.0 秒   10円玉を机に置く音（チャリン、小さな跳ね）
 0.4 秒〜 部屋の静けさ・笙の和音がゆっくりふくらむ
-6.2 秒   浮き彫りが本物の鳳凰堂に溶ける：梵鐘、笙が開く、池の水音と秋の虫
-15.2 秒  終わり
+6.2 秒   浮き彫りが立体に立ち上がり、本物の鳳凰堂になって全景まで引く：梵鐘、笙が開く、池の水音と秋の虫
+15.2 秒  締め：手元の 10円玉に戻って、りん
+18.7 秒  終わり
 
 出力：build/audio/juuen_mix.wav（48kHz・16bit・ステレオ）
 """
@@ -17,9 +18,11 @@ SR = 48000
 FPS = 24
 COIN_CUT = 149                  # 10円玉の 149 コマのあとに鳳凰堂が始まる（compose.sh と同じ）
 BLD_LEN = 216
-DUR = (COIN_CUT + BLD_LEN) / FPS
+END_LEN = 84                    # 締めの 10円玉（finish/compose_juuen.py と同じ）
+DUR = (COIN_CUT + BLD_LEN + END_LEN) / FPS
 N = int(SR * DUR)
 T_MELT = COIN_CUT / FPS
+T_END = (COIN_CUT + BLD_LEN) / FPS  # 締めのカット
 rng = np.random.default_rng(11)
 OUT = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'build', 'audio')
 
@@ -142,11 +145,26 @@ for k in range(int(n / SR * 2.5)):
         tt = np.arange(m) / SR
         lap[i0:i0 + m] += np.sin(2 * np.pi * rng.uniform(300, 900) * tt * (1 + 2.5 * tt)) * np.exp(-tt * 28) * rng.uniform(0.3, 1)
 water = (wash * 0.9 + bp(lap, 200, 3000) * 0.35) * np.clip(t / 2.5, 0, 1)
+water *= np.clip((T_END + 0.2 - (T_MELT + t)) / 0.8, 0, 1)
 place(mix, water, T_MELT, 0.12, -0.1)
 car = np.sin(2 * np.pi * 4300 * t) * (np.sin(2 * np.pi * 42 * t) > 0)
 ph = (t % 1.4) / 1.4
 suzu = car * np.where(ph < 0.45, np.sin(np.pi * ph / 0.45), 0) * np.clip((t - 1.5) / 2.0, 0, 1)
+suzu *= np.clip((T_END + 0.2 - (T_MELT + t)) / 0.8, 0, 1)
 place(mix, suzu, T_MELT, 0.012, 0.5)
+
+# ---- 締め：手元の 10円玉に戻ったところで、澄んだりんを 1 つ ---------------------------------------------
+def rin(f=640, dur=4.5):
+    n = int(dur * SR)
+    t = np.arange(n) / SR
+    s = np.zeros(n)
+    for ratio, a, dcy in ((1.0, 1.0, 0.7), (2.76, 0.55, 1.4), (5.40, 0.3, 2.4), (8.93, 0.15, 3.5)):
+        s += a * np.sin(2 * np.pi * f * ratio * t) * np.exp(-t * dcy) * (1 + 0.15 * np.sin(2 * np.pi * 3.1 * ratio * t))
+    s += 0.3 * hp(rng.standard_normal(n), 4000) * np.exp(-t * 80)
+    return s
+
+
+place(mix, rin(), T_END + 0.3, 0.16, 0.15)
 
 # ---- 仕上げ：軽い残響・終わりのフェード・音量 ---------------------------------------------------------
 rev = np.zeros_like(mix)
