@@ -23,6 +23,7 @@
 | `build/coin_end/` | 締めの 10円玉の 84 コマ |
 | `build/audio/juuen_mix.wav` | 10円玉を置く音・笙・梵鐘・池の水音・秋の虫・りん（18.7 秒） |
 | `build/juuen.mp4` | 完成版（1920×1080・24fps・18.7 秒・音あり） |
+| `build/juuen_process.mp4` | 作り方の動画（120 BPM の和のビートに合わせて、1 小節ごとに工程を見せる。18 秒） |
 
 ![10円玉の面の高さ](docs/coin_face.png)
 
@@ -43,6 +44,7 @@ make all       # 鳳凰堂のシーン → 奥行き画像 → 10円玉の面 �
 make test      # 10円玉と鳳凰堂の要所を半分の解像度で build/test/ に描いて確かめる
 make render    # 本番（鳳凰堂・銅の浮き彫り・10円玉・締め）
 make video     # build/juuen.mp4
+make process   # 作り方の動画 build/juuen_process.mp4
 ```
 
 `make render` は低い優先度で Blender を動かし、描き終えたコマは飛ばして続きから描きます（`tools/render_juuen.sh`）。M5 の MacBook で約 1 時間でした。
@@ -84,6 +86,8 @@ tools/
   test_frames.py       確認用に数コマだけ描く
 sound/juuen_audio.py 音
 finish/compose_juuen.py  つないで mp4 に（yuv420p）
+finish/make_process.py   作り方の動画
+sound/process_beat.py    作り方の動画のビート
 geometry.py・scene/・cad/・drawing/  鳳凰堂のモデル（aiimpl/byodoin と同じ）
 ```
 

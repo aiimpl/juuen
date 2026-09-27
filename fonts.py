@@ -3,6 +3,7 @@
   BYODOIN_FONT_TITLE   題字・タイトル（太い明朝）
   BYODOIN_FONT_MINCHO  ラベル（明朝）
   BYODOIN_FONT_SERIF   欧文（ローマ字の添え書き）
+  BYODOIN_FONT_GOTHIC  字幕（太い角ゴシック）
 """
 import glob
 import os
@@ -13,6 +14,7 @@ _CANDIDATES = {
         '/System/Library/Fonts/ヒラギノ明朝 ProN.ttc',
     ],
     'mincho': ['/System/Library/Fonts/ヒラギノ明朝 ProN.ttc'],
+    'gothic': ['/System/Library/Fonts/ヒラギノ角ゴシック W8.ttc', '/System/Library/Fonts/ヒラギノ角ゴシック W6.ttc'],
     'serif': ['/System/Library/Fonts/Supplemental/Didot.ttc', '/System/Library/Fonts/Supplemental/Baskerville.ttc'],
 }
 

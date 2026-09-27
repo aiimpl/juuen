@@ -3,13 +3,14 @@
 #   make test     10円玉と鳳凰堂の要所を半分の解像度で描く（数分）
 #   make render   本番（鳳凰堂 216 コマ＋10円玉 168 コマ。M5 の Mac で約 1 時間）
 #   make video    つないで build/juuen.mp4 に
+#   make process  作り方の動画 build/juuen_process.mp4（ビートに合わせて工程を見せる）
 #
 # もとの「CAD 図面 → Blender」20 秒の動画は make byodoin-render / make byodoin-video
 
 PYTHON  ?= python3
 BLENDER ?= blender
 
-.PHONY: all dxf dxf-preview scroll audio title scene depth face coin juuen-audio test camera render video \
+.PHONY: all dxf dxf-preview scroll audio title scene depth face coin juuen-audio test camera render video process \
         byodoin-test byodoin-render byodoin-video clean
 
 all: scene depth face coin juuen-audio
@@ -36,6 +37,10 @@ render:
 
 video:
 	$(PYTHON) finish/compose_juuen.py
+
+process:
+	$(PYTHON) sound/process_beat.py
+	$(PYTHON) finish/make_process.py
 
 dxf:
 	$(PYTHON) cad/make_dxf.py
