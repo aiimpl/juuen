@@ -10,6 +10,6 @@ for S in $(seq 1 24 216); do
   nice -n 15 blender -b build/byodoin.blend -P tools/building_shot.py -- "$S" "$E" > build/bld_frames/chunk_$S.log 2>&1
   echo "$(date +%H:%M:%S) building $S-$E" >> "$LOG"
 done
-nice -n 15 blender -b build/coin.blend -a > build/coin_frames/render.log 2>&1
+nice -n 15 blender -b build/coin.blend -P coin/render_coin.py > build/coin_frames/render.log 2>&1
 echo "$(date +%H:%M:%S) coin done" >> "$LOG"
 echo "done $(date)" >> "$LOG"

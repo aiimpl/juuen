@@ -15,7 +15,7 @@ from mathutils import Vector, Matrix
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
-sys.path.insert(0, os.path.join(ROOT, 'coin'))
+from coin.spec import R_COIN, THICK, RECT_W, RECT_CY  # noqa: E402
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
 scn = bpy.context.scene
@@ -24,8 +24,8 @@ scn.render.fps = FPS
 scn.frame_start, scn.frame_end = 1, F_END
 
 MM = 0.001
-R_COIN, THICK = 11.75, 1.5
-RECT_W, RECT_CY = 19.0, 0.35
+# 光の強さ（本物の写真と並べて、地・浮き彫り・縁の色が合うように決めた）
+KEY_E, SOFT_E, WORLD, EXPOSURE = 0.06, 0.0, 0.16, 1.5
 
 
 def node_mat(name):
@@ -52,34 +52,39 @@ def L(nt, a, b):
     nt.links.new(a, b)
 
 
-# ---- 青銅（10円玉は銅 95%・亜鉛 3〜4%・錫 1〜2%）----------------------------------------
+# ---- 青銅（10円玉は銅 95%・亜鉛 3〜4%・錫 1〜2%）。色は本物の写真の地・縁・浮き彫りから測った比（R:G:B ≒ 1:0.42:0.18）----------------------------------------
 def bronze():
     m, nt, out = node_mat('青銅')
     b = N(nt, 'ShaderNodeBsdfPrincipled', inputs={'Metallic': 1.0, 'Roughness': 0.34})
     tc = N(nt, 'ShaderNodeTexCoord')
     h = N(nt, 'ShaderNodeAttribute', attribute_type='GEOMETRY', attribute_name='h')      # 表面の高さ（mm）
-    ao = N(nt, 'ShaderNodeAmbientOcclusion', inputs={'Distance': 0.00045})
+    ao = N(nt, 'ShaderNodeAmbientOcclusion', inputs={'Distance': 0.00022})
     ao.samples = 12
     # 高い所（縁・浮き彫り・文字の上）は触られて明るく、くぼみは酸化して暗い
     hi = N(nt, 'ShaderNodeMapRange', inputs={1: 0.05, 2: 0.2, 3: 0.0, 4: 1.0})
     L(nt, h.outputs['Fac'], hi.inputs[0])
     col_mid = N(nt, 'ShaderNodeValToRGB')
-    col_mid.color_ramp.elements[0].color = (0.36, 0.14, 0.06, 1)
-    col_mid.color_ramp.elements[1].color = (0.74, 0.36, 0.17, 1)
+    col_mid.color_ramp.elements[0].color = (0.30, 0.085, 0.028, 1)
+    col_mid.color_ramp.elements[1].color = (0.68, 0.23, 0.075, 1)
     blot = N(nt, 'ShaderNodeTexNoise', inputs={'Scale': 180.0, 'Detail': 6.0, 'Roughness': 0.6})
     L(nt, tc.outputs['Object'], blot.inputs['Vector'])
     L(nt, blot.outputs['Fac'], col_mid.inputs[0])
     polish = N(nt, 'ShaderNodeMix', data_type='RGBA')
     L(nt, hi.outputs[0], polish.inputs['Factor'])
     L(nt, col_mid.outputs[0], polish.inputs[6])
-    polish.inputs[7].default_value = (0.98, 0.62, 0.40, 1)
-    aor = N(nt, 'ShaderNodeMapRange', inputs={1: 0.2, 2: 1.0, 3: 0.25, 4: 1.0})
+    polish.inputs[7].default_value = (0.92, 0.42, 0.17, 1)
+    aor = N(nt, 'ShaderNodeMapRange', inputs={1: 0.45, 2: 0.95, 3: 0.12, 4: 1.0})
     L(nt, ao.outputs['AO'], aor.inputs[0])
     patina = N(nt, 'ShaderNodeMix', data_type='RGBA', inputs={'Factor': 1.0})
     patina.blend_type = 'MULTIPLY'
     L(nt, polish.outputs[2], patina.inputs[6])
     L(nt, aor.outputs[0], patina.inputs[7])
-    L(nt, patina.outputs[2], b.inputs['Base Color'])
+    cav = N(nt, 'ShaderNodeAttribute', attribute_type='GEOMETRY', attribute_name='cav')
+    dirt = N(nt, 'ShaderNodeMix', data_type='RGBA')
+    L(nt, cav.outputs['Fac'], dirt.inputs['Factor'])
+    L(nt, patina.outputs[2], dirt.inputs[6])
+    dirt.inputs[7].default_value = (0.09, 0.028, 0.012, 1)     # 酸化して黒ずんだ銅
+    L(nt, dirt.outputs[2], b.inputs['Base Color'])
     # 粗さ：細かいすり傷（向きの違う細長いノイズを 2 枚）と、指紋のくもり
     def scratches(rotz, scale):
         # 先に回してから引き伸ばす（Mapping は拡大→回転の順なので 2 段に分ける）
@@ -102,7 +107,7 @@ def bronze():
     L(nt, s3, smax.inputs[1])
     finger = N(nt, 'ShaderNodeTexNoise', inputs={'Scale': 90.0, 'Detail': 3.0})
     L(nt, tc.outputs['Object'], finger.inputs['Vector'])
-    rough = N(nt, 'ShaderNodeMapRange', inputs={1: 0.3, 2: 0.7, 3: 0.24, 4: 0.46})
+    rough = N(nt, 'ShaderNodeMapRange', inputs={1: 0.3, 2: 0.7, 3: 0.34, 4: 0.52})
     L(nt, finger.outputs['Fac'], rough.inputs[0])
     rh = N(nt, 'ShaderNodeMath', operation='MULTIPLY_ADD', inputs={1: 0.18})
     L(nt, smax.outputs[0], rh.inputs[0])
@@ -110,7 +115,7 @@ def bronze():
     rpol = N(nt, 'ShaderNodeMix', data_type='FLOAT')
     L(nt, hi.outputs[0], rpol.inputs['Factor'])
     L(nt, rh.outputs[0], rpol.inputs[2])
-    rpol.inputs[3].default_value = 0.2
+    rpol.inputs[3].default_value = 0.27
     L(nt, rpol.outputs[0], b.inputs['Roughness'])
     bump = N(nt, 'ShaderNodeBump', inputs={'Strength': 0.12, 'Distance': 0.00001})
     L(nt, smax.outputs[0], bump.inputs['Height'])
@@ -163,6 +168,9 @@ me.update(calc_edges=True)
 me.polygons.foreach_set('use_smooth', [True] * len(quads))
 at = me.attributes.new('h', 'FLOAT', 'POINT')
 at.data.foreach_set('value', fh.ravel().astype(np.float32))
+cav = np.load(os.path.join(ROOT, 'build', 'coin_cav.npy'))[::step, ::step]
+at = me.attributes.new('cav', 'FLOAT', 'POINT')
+at.data.foreach_set('value', cav.ravel().astype(np.float32))
 me.materials.append(BRONZE)
 top = bpy.data.objects.new('十円玉_表', me)
 scn.collection.objects.link(top)
@@ -176,13 +184,13 @@ bv.width = 0.12 * MM
 bv.segments = 4
 bpy.ops.object.shade_smooth()
 m_side, nt, out = node_mat('青銅_側面')
-b = N(nt, 'ShaderNodeBsdfPrincipled', inputs={'Base Color': (0.55, 0.3, 0.18, 1), 'Metallic': 1.0, 'Roughness': 0.3})
+b = N(nt, 'ShaderNodeBsdfPrincipled', inputs={'Base Color': (0.60, 0.27, 0.11, 1), 'Metallic': 1.0, 'Roughness': 0.36})
 L(nt, b.outputs[0], out.inputs['Surface'])
 side.data.materials.append(m_side)
 
 # ---- 机：暗いくるみ材 -----------------------------------------------------------------
 m, nt, out = node_mat('くるみ材')
-b = N(nt, 'ShaderNodeBsdfPrincipled', inputs={'Roughness': 0.45, 'Coat Weight': 0.3, 'Coat Roughness': 0.2})
+b = N(nt, 'ShaderNodeBsdfPrincipled', inputs={'Roughness': 0.55, 'Coat Weight': 0.08, 'Coat Roughness': 0.35})
 tc = N(nt, 'ShaderNodeTexCoord')
 mp = N(nt, 'ShaderNodeMapping', inputs={'Scale': (60.0, 6.0, 60.0)})
 L(nt, tc.outputs['Object'], mp.inputs['Vector'])
@@ -215,9 +223,9 @@ def area(name, loc, size, energy, color, target=(0, 0, 0)):
     return ob
 
 
-key = area('斜光', (-0.09, 0.07, 0.055), 0.03, 0.11, (1.0, 0.86, 0.72))
-soft = area('照り返し', (0.0, -0.02, 0.16), 0.16, 0.042, (1.0, 0.97, 0.94))
-rimL = area('輪郭光', (0.1, 0.1, 0.04), 0.04, 0.02, (0.75, 0.85, 1.0))
+key = area('斜光', (-0.09, 0.07, 0.055), 0.06, KEY_E, (1.0, 0.93, 0.85))
+soft = area('照り返し', (0.0, -0.02, 0.16), 0.16, SOFT_E, (1.0, 0.98, 0.96))
+rimL = area('輪郭光', (0.1, 0.1, 0.04), 0.04, 0.008, (0.9, 0.93, 1.0))
 # 光の筋が面を横切る：斜光をゆっくり回す
 for f, ang in ((1, -0.25), (60, 0.0), (120, 0.35), (F_END, 0.42)):
     r = math.hypot(key.location.x, key.location.y) if f == 1 else 0.114
@@ -226,12 +234,29 @@ for f, ang in ((1, -0.25), (60, 0.0), (120, 0.35), (F_END, 0.42)):
     key.keyframe_insert('location', frame=f)
     key.keyframe_insert('rotation_euler', frame=f)
 # 低い角度からは照り返しが面いっぱいに乗るので、斜光は弱く始めて、上へ回り込むにつれ強める
-for f, e in ((1, 0.035), (80, 0.11)):
+for f, e in ((1, KEY_E * 0.7), (80, KEY_E)):
     key.data.energy = e
     key.data.keyframe_insert('energy', frame=f)
 
 w = bpy.data.worlds.new('スタジオ')
-w.node_tree.nodes['Background'].inputs['Color'].default_value = (0.012, 0.011, 0.012, 1)
+# 本物の写真のように、まわり全体から柔らかい光が回る（暗い背景に強い光だと、照り返しが後光のように白く飛ぶ）
+# 明るいのは真上の丸い天井だけで、横（地平線）は暗い。斜めから見たとき金属が横の光を拾って全体が光るのを防ぐ
+wnt = w.node_tree
+bg = wnt.nodes['Background']
+wtc = wnt.nodes.new('ShaderNodeTexCoord')
+wsep = wnt.nodes.new('ShaderNodeSeparateXYZ')
+wnt.links.new(wtc.outputs['Generated'], wsep.inputs[0])
+dome = wnt.nodes.new('ShaderNodeMapRange')
+dome.inputs[1].default_value, dome.inputs[2].default_value = 0.45, 0.92
+dome.inputs[3].default_value, dome.inputs[4].default_value = 0.03, 1.0
+wnt.links.new(wsep.outputs['Z'], dome.inputs[0])
+wcol = wnt.nodes.new('ShaderNodeMix')
+wcol.data_type = 'RGBA'
+wcol.blend_type = 'MULTIPLY'
+wcol.inputs['Factor'].default_value = 1.0
+wcol.inputs[6].default_value = (WORLD, WORLD * 0.97, WORLD * 0.94, 1)
+wnt.links.new(dome.outputs[0], wcol.inputs[7])
+wnt.links.new(wcol.outputs[2], bg.inputs['Color'])
 scn.world = w
 
 # ---- カメラ：マクロ 100mm。1 コマずつ位置・向き・ピント・絞りを計算してキーを打つ ---------------
@@ -315,8 +340,12 @@ ee.ray_tracing_options.trace_max_roughness = 0.5
 ee.use_shadows = True
 ee.shadow_ray_count = 2
 ee.shadow_step_count = 8
-scn.view_settings.view_transform = 'AgX'
-scn.view_settings.look = 'AgX - Medium High Contrast'
+scn.view_settings.view_transform = 'Standard'          # 色を写真と測って合わせるので、色味を変えない変換
+scn.view_settings.look = 'None'
+# 真上から見たときの色を本物の写真に合わせてある。斜めから見るあいだは照り返しで白く光らないよう暗めに始め、真上に来るまでに戻す
+for f, ev in ((1, EXPOSURE - 1.3), (40, EXPOSURE - 1.0), (110, EXPOSURE)):
+    scn.view_settings.exposure = ev
+    scn.view_settings.keyframe_insert('exposure', frame=f)
 scn.frame_set(1)
 bpy.ops.wm.save_as_mainfile(filepath=os.path.join(ROOT, 'build', 'coin.blend'))
 print('saved coin.blend', len(me.vertices), 'verts')
