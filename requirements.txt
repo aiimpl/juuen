@@ -1,0 +1,5 @@
+numpy
+scipy
+pillow
+ezdxf
+matplotlib   # cad/preview.py（DXF を PNG で確認するとき）だけ
